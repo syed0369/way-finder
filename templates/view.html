@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wayfinder — Get Directions</title>
+<style>
+  :root {
+    --ink: #0e2a3d;
+    --paper: #eef3f6;
+    --line: #4f8ca6;
+    --line-dim: #9fc1cf;
+    --accent: #ff6b35;
+    --grid: #d6e3ea;
+    --mono: 'JetBrains Mono', 'Courier New', monospace;
+    --sans: 'Inter', -apple-system, sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--paper);
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 24px 24px;
+    color: var(--ink);
+    min-height: 100vh;
+    padding: 24px 16px 60px;
+  }
+
+  header {
+    max-width: 640px;
+    margin: 0 auto 20px;
+    border-bottom: 3px solid var(--ink);
+    padding-bottom: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  header h1 {
+    font-family: var(--mono);
+    font-size: 24px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  header h1 span { color: var(--accent); }
+
+  header .tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--line);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .layout {
+    max-width: 640px;
+    margin: 0 auto;
+  }
+
+  .panel {
+    background: #fff;
+    border: 1px solid var(--line-dim);
+    border-radius: 4px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+
+  .panel h2 {
+    font-family: var(--mono);
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--line);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .panel h2::before {
+    content: '';
+    width: 8px; height: 8px;
+    background: var(--accent);
+    display: inline-block;
+  }
+
+  .field-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+  .field-row > * { flex: 1; min-width: 140px; }
+  select {
+    font-family: var(--sans);
+    font-size: 14px;
+    padding: 10px 12px;
+    border: 1px solid var(--line-dim);
+    border-radius: 3px;
+    background: #fff;
+    width: 100%;
+  }
+
+  button {
+    font-family: var(--sans);
+    font-size: 14px;
+    background: var(--ink);
+    color: #fff;
+    border: none;
+    border-radius: 3px;
+    padding: 12px 18px;
+    cursor: pointer;
+    font-weight: 600;
+    width: 100%;
+    transition: background 0.15s;
+  }
+  button:hover { background: var(--accent); }
+  button:disabled { background: #c7d2d8; cursor: not-allowed; }
+
+  .swap-btn {
+    width: auto;
+    flex: 0 0 auto;
+    background: transparent;
+    color: var(--ink);
+    border: 1px solid var(--line-dim);
+    padding: 10px 14px;
+    align-self: center;
+  }
+  .swap-btn:hover { background: var(--paper); color: var(--ink); }
+
+  .canvas-wrap {
+    position: relative;
+    border: 1px solid var(--line-dim);
+    border-radius: 4px;
+    overflow: hidden;
+    background: #fff;
+    margin-bottom: 16px;
+  }
+  #planImg { display: block; width: 100%; user-select: none; }
+  #overlay { position: absolute; top: 0; left: 0; pointer-events: none; }
+
+  .route-card { margin-top: 16px; }
+  .route-summary {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--line);
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px dashed var(--line-dim);
+  }
+  .route-summary .dist { color: var(--accent); font-weight: 700; }
+
+  .step {
+    display: flex;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--grid);
+    align-items: flex-start;
+  }
+  .step:last-child { border-bottom: none; }
+  .step-icon {
+    font-family: var(--mono);
+    font-size: 18px;
+    width: 28px;
+    text-align: center;
+    flex-shrink: 0;
+    color: var(--accent);
+  }
+  .step-text { font-size: 14px; line-height: 1.5; }
+  .step-text .from-to { font-weight: 600; }
+  .step-text .meta {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--line);
+    margin-top: 2px;
+  }
+
+  .error-msg {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--accent);
+    background: #fff1ec;
+    border: 1px solid #ffd0bd;
+    padding: 10px 12px;
+    border-radius: 3px;
+  }
+
+  .hint {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--line);
+    line-height: 1.6;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>WAY<span>FINDER</span></h1>
+  <div class="tag">get directions</div>
+</header>
+
+<div class="layout">
+  {% if not_found %}
+  <div class="panel">
+    <div class="error-msg">This plan could not be found. The link may be invalid or the server may have restarted.</div>
+  </div>
+  {% else %}
+
+  <div class="panel" id="mapPanel" style="display:none;">
+    <h2>Floor plan</h2>
+    <div class="canvas-wrap">
+      <img id="planImg" src="{{ image_url }}" alt="Floor plan">
+      <canvas id="overlay"></canvas>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Where are you headed?</h2>
+    <div class="field-row">
+      <select id="sourceSelect"><option>Loading rooms...</option></select>
+    </div>
+    <div class="field-row">
+      <select id="destSelect"><option>Loading rooms...</option></select>
+      <button class="swap-btn" id="swapBtn" title="Swap source and destination">⇄</button>
+    </div>
+    <button id="findRouteBtn" disabled>Get directions</button>
+    <div id="routeResult"></div>
+  </div>
+
+  {% endif %}
+</div>
+
+<script>
+const planId = "{{ plan_id }}";
+const sourceSelect = document.getElementById('sourceSelect');
+const destSelect = document.getElementById('destSelect');
+const findRouteBtn = document.getElementById('findRouteBtn');
+const swapBtn = document.getElementById('swapBtn');
+const routeResult = document.getElementById('routeResult');
+const mapPanel = document.getElementById('mapPanel');
+const planImg = document.getElementById('planImg');
+const overlay = document.getElementById('overlay');
+
+let nodes = {};
+let ctx = null;
+let lastPath = null;
+
+async function init() {
+  const res = await fetch(`/plan/${planId}/graph`);
+  const data = await res.json();
+
+  if (data.error || !data.nodes || data.nodes.length === 0) {
+    sourceSelect.innerHTML = '<option>No rooms available</option>';
+    destSelect.innerHTML = '<option>No rooms available</option>';
+    routeResult.innerHTML = '<div class="error-msg">This plan has no rooms marked yet.</div>';
+    return;
+  }
+
+  data.nodes.forEach(n => nodes[n.id] = n);
+
+  const opts = data.nodes.map(n => `<option value="${n.id}">${n.name}</option>`).join('');
+  sourceSelect.innerHTML = opts;
+  destSelect.innerHTML = opts;
+  if (data.nodes.length > 1) {
+    destSelect.selectedIndex = 1;
+  }
+  findRouteBtn.disabled = false;
+
+  if (planImg.src) {
+    if (planImg.complete && planImg.naturalWidth > 0) {
+      setupCanvas();
+    } else {
+      planImg.onload = setupCanvas;
+    }
+    mapPanel.style.display = 'block';
+  }
+}
+
+function setupCanvas() {
+  overlay.width = planImg.naturalWidth;
+  overlay.height = planImg.naturalHeight;
+  ctx = overlay.getContext('2d');
+}
+
+swapBtn.addEventListener('click', () => {
+  const s = sourceSelect.value;
+  const d = destSelect.value;
+  sourceSelect.value = d;
+  destSelect.value = s;
+});
+
+findRouteBtn.addEventListener('click', async () => {
+  const source = sourceSelect.value;
+  const target = destSelect.value;
+
+  if (source === target) {
+    routeResult.innerHTML = '<div class="error-msg">Source and destination are the same room.</div>';
+    return;
+  }
+
+  routeResult.innerHTML = '<p class="hint">Calculating route...</p>';
+
+  const res = await fetch(`/plan/${planId}/path?source=${source}&target=${target}`);
+  const data = await res.json();
+
+  if (data.error) {
+    routeResult.innerHTML = `<div class="error-msg">${data.error}</div>`;
+    return;
+  }
+
+});
+
+function iconForInstruction(instr) {
+  if (instr.includes('right')) return '↱';
+  if (instr.includes('left')) return '↰';
+  if (instr.includes('around')) return '↶';
+  if (instr.includes('straight') || instr.includes('Face')) return '↑';
+  return '•';
+}
+
+init();
+</script>
+</body>
+</html>

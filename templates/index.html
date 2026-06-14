@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wayfinder — Indoor Route Planner</title>
+<style>
+  :root {
+    --ink: #0e2a3d;
+    --paper: #eef3f6;
+    --line: #4f8ca6;
+    --line-dim: #9fc1cf;
+    --accent: #ff6b35;
+    --grid: #d6e3ea;
+    --mono: 'JetBrains Mono', 'Courier New', monospace;
+    --sans: 'Inter', -apple-system, sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--paper);
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 24px 24px;
+    color: var(--ink);
+    min-height: 100vh;
+    padding: 32px 24px 80px;
+  }
+
+  header {
+    max-width: 1100px;
+    margin: 0 auto 28px;
+    border-bottom: 3px solid var(--ink);
+    padding-bottom: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  header h1 {
+    font-family: var(--mono);
+    font-size: 28px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  header h1 span { color: var(--accent); }
+
+  header .tag {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--line);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .layout {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1.6fr 1fr;
+    gap: 24px;
+  }
+
+  @media (max-width: 880px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: #fff;
+    border: 1px solid var(--line-dim);
+    border-radius: 4px;
+    padding: 20px;
+  }
+
+  .panel + .panel { margin-top: 24px; }
+
+  .panel h2 {
+    font-family: var(--mono);
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--line);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .panel h2::before {
+    content: '';
+    width: 8px; height: 8px;
+    background: var(--accent);
+    display: inline-block;
+  }
+
+  .panel h2 .h2-rest {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex: 1;
+  }
+
+  .step-num {
+    font-family: var(--mono);
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  input[type="file"], select, button {
+    font-family: var(--sans);
+    font-size: 14px;
+  }
+
+  .file-drop {
+    border: 2px dashed var(--line-dim);
+    border-radius: 4px;
+    padding: 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .file-drop:hover { border-color: var(--accent); background: #fff7f3; }
+  .file-drop input { display: none; }
+  .file-drop p { font-size: 13px; color: var(--line); margin-top: 6px; }
+
+  button {
+    background: var(--ink);
+    color: #fff;
+    border: none;
+    border-radius: 3px;
+    padding: 10px 18px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.15s;
+  }
+  button:hover { background: var(--accent); }
+  button.secondary {
+    background: transparent;
+    color: var(--ink);
+    border: 1px solid var(--ink);
+  }
+  button.secondary:hover { background: var(--ink); color: #fff; }
+  button:disabled { background: #c7d2d8; cursor: not-allowed; }
+
+  button.qr-btn {
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 6px 12px;
+    font-size: 12px;
+    font-family: var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    width: auto;
+  }
+  button.qr-btn:hover { background: var(--accent); color: #fff; }
+  button.qr-btn:disabled { background: transparent; color: var(--line-dim); border-color: var(--line-dim); cursor: not-allowed; }
+
+  .canvas-wrap {
+    position: relative;
+    border: 1px solid var(--line-dim);
+    border-radius: 4px;
+    overflow: hidden;
+    background: #fff;
+    min-height: 200px;
+  }
+
+  #planImg { display: block; max-width: 100%; user-select: none; }
+  #overlay { position: absolute; top: 0; left: 0; cursor: crosshair; z-index: 10; background: transparent; }
+
+  .placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 320px;
+    color: var(--line-dim);
+    font-family: var(--mono);
+    font-size: 13px;
+    text-align: center;
+    padding: 20px;
+  }
+
+  .mode-bar {
+    display: flex;
+    gap: 8px;
+    margin: 12px 0;
+    flex-wrap: wrap;
+  }
+
+  .mode-bar button.active {
+    background: var(--accent);
+    color: #fff;
+  }
+  .mode-bar button.active.secondary {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: #fff7f3;
+  }
+
+  .hint {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--line);
+    margin-top: 10px;
+    line-height: 1.6;
+  }
+
+  .room-list {
+    list-style: none;
+    margin-top: 10px;
+    max-height: 180px;
+    overflow-y: auto;
+  }
+  .room-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--grid);
+    font-size: 13px;
+  }
+  .room-list li button {
+    padding: 2px 8px;
+    font-size: 11px;
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+  }
+  .room-list li button:hover { background: var(--accent); color: #fff; }
+
+  .field-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+  .field-row > * { flex: 1; min-width: 120px; }
+  .field-row select, .field-row input[type="text"] {
+    padding: 8px 10px;
+    border: 1px solid var(--line-dim);
+    border-radius: 3px;
+    background: #fff;
+  }
+
+  .route-card {
+    margin-top: 16px;
+  }
+  .route-summary {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--line);
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px dashed var(--line-dim);
+  }
+  .route-summary .dist { color: var(--accent); font-weight: 700; }
+
+  .step {
+    display: flex;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--grid);
+    align-items: flex-start;
+  }
+  .step:last-child { border-bottom: none; }
+  .step-icon {
+    font-family: var(--mono);
+    font-size: 18px;
+    width: 28px;
+    text-align: center;
+    flex-shrink: 0;
+    color: var(--accent);
+  }
+  .step-text { font-size: 14px; line-height: 1.5; }
+  .step-text .from-to { font-weight: 600; }
+  .step-text .meta {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--line);
+    margin-top: 2px;
+  }
+
+  .error-msg {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--accent);
+    background: #fff1ec;
+    border: 1px solid #ffd0bd;
+    padding: 10px 12px;
+    border-radius: 3px;
+  }
+
+  .legend-node {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--line);
+    display: inline-block;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 1px var(--line);
+  }
+
+  .modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal.active { display: flex; }
+  .modal-content {
+    background: #fff;
+    padding: 24px;
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    min-width: 300px;
+  }
+  .modal-content h3 {
+    margin: 0 0 16px;
+    font-family: var(--mono);
+    color: var(--ink);
+  }
+  .modal-content input {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--line-dim);
+    border-radius: 3px;
+    font-size: 14px;
+    box-sizing: border-box;
+    margin-bottom: 12px;
+  }
+  .modal-content .button-row {
+    display: flex;
+    gap: 8px;
+  }
+  .modal-content button { flex: 1; margin: 0; }
+
+  .qr-modal-content {
+    text-align: center;
+    max-width: 340px;
+  }
+  .qr-modal-content #qrCanvasWrap {
+    display: flex;
+    justify-content: center;
+    margin: 16px 0;
+    padding: 16px;
+    background: #fff;
+    border: 1px solid var(--grid);
+    border-radius: 4px;
+  }
+  .qr-link-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .qr-link-row input {
+    margin-bottom: 0;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  .qr-link-row button {
+    flex: 0 0 auto;
+    width: auto;
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+  .qr-modal-content .hint { text-align: left; margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>WAY<span>FINDER</span></h1>
+  <div class="tag">indoor route graph · v1</div>
+</header>
+
+<div class="layout">
+  <div>
+    <div class="panel">
+      <h2><span class="step-num">01</span> Building plan</h2>
+      <div class="file-drop" id="dropZone">
+        <input type="file" id="fileInput" accept="image/*">
+        <p id="dropLabel">Click to upload a floor plan image (PNG / JPG)</p>
+      </div>
+
+      <div class="mode-bar" id="modeBar" style="display:none;">
+        <button class="secondary active" id="modeRoom">+ Mark room</button>
+        <button class="secondary" id="modeEdge">+ Connect rooms</button>
+      </div>
+
+      <div class="canvas-wrap" id="canvasWrap">
+        <div class="placeholder" id="placeholder">Upload a plan to start marking rooms and connections.</div>
+      </div>
+
+      <p class="hint" id="canvasHint" style="display:none;">
+        <span class="legend-node"></span>&nbsp; <strong>Mark room:</strong> click on the plan, then name the room.<br>
+        <strong>Connect rooms:</strong> click one room node, then another, to link them with a path.
+      </p>
+    </div>
+
+    <div class="panel" id="roomsPanel" style="display:none;">
+      <h2><span class="step-num">02</span> Rooms &amp; connections</h2>
+      <ul class="room-list" id="roomList"></ul>
+      <p class="hint">Connections:</p>
+      <ul class="room-list" id="edgeList"></ul>
+    </div>
+  </div>
+
+  <div>
+    <div class="panel">
+      <h2>
+        <span class="step-num">03</span>
+        <span class="h2-rest">
+          <span>Find route</span>
+          <button class="qr-btn" id="generateQrBtn" disabled title="Generate a QR code so others can get directions on their phone">Share via QR</button>
+        </span>
+      </h2>
+      <div class="field-row">
+        <select id="sourceSelect" disabled><option>Upload a plan first</option></select>
+        <select id="destSelect" disabled><option>Upload a plan first</option></select>
+      </div>
+      <button id="findRouteBtn" disabled style="width:100%;">Get directions</button>
+
+      <div id="routeResult"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="roomNameModal">
+  <div class="modal-content">
+    <h3>Enter room name</h3>
+    <input type="text" id="roomNameInput" placeholder="e.g., Living Room" autofocus>
+    <div class="button-row">
+      <button onclick="cancelRoomName()">Cancel</button>
+      <button onclick="submitRoomName()" style="background: var(--accent);">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="qrModal">
+  <div class="modal-content qr-modal-content">
+    <h3>Share this plan</h3>
+    <div id="qrCanvasWrap"></div>
+    <div class="qr-link-row">
+      <input type="text" id="qrLinkInput" readonly>
+      <button id="copyLinkBtn" class="secondary">Copy</button>
+    </div>
+    <p class="hint">Scan this code (or open the link) to pick any two rooms on this plan and get turn-by-turn directions — no editing tools, just the route finder.</p>
+    <div class="button-row" style="margin-top:16px;">
+      <button onclick="closeQrModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/qrcode-gen.js"></script>
+<script>
+const fileInput = document.getElementById('fileInput');
+const dropZone = document.getElementById('dropZone');
+const dropLabel = document.getElementById('dropLabel');
+const canvasWrap = document.getElementById('canvasWrap');
+const placeholder = document.getElementById('placeholder');
+const modeBar = document.getElementById('modeBar');
+const modeRoomBtn = document.getElementById('modeRoom');
+const modeEdgeBtn = document.getElementById('modeEdge');
+const canvasHint = document.getElementById('canvasHint');
+const roomsPanel = document.getElementById('roomsPanel');
+const roomList = document.getElementById('roomList');
+const edgeListEl = document.getElementById('edgeList');
+const sourceSelect = document.getElementById('sourceSelect');
+const destSelect = document.getElementById('destSelect');
+const findRouteBtn = document.getElementById('findRouteBtn');
+const routeResult = document.getElementById('routeResult');
+const generateQrBtn = document.getElementById('generateQrBtn');
+
+let planId = null;
+let img = null;
+let overlay = null;
+let ctx = null;
+let mode = 'room'; // 'room' or 'edge'
+let nodes = {}; // id -> {id, name, x, y}
+let edges = []; // {source, target, weight}
+let edgeFirstNode = null;
+let pendingRoomCoords = null; // Store coords when waiting for room name
+
+dropZone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', handleFileSelect);
+
+function showRoomNameModal(x, y) {
+  pendingRoomCoords = { x, y };
+  document.getElementById('roomNameModal').classList.add('active');
+  document.getElementById('roomNameInput').value = '';
+  document.getElementById('roomNameInput').focus();
+}
+
+function cancelRoomName() {
+  pendingRoomCoords = null;
+  document.getElementById('roomNameModal').classList.remove('active');
+}
+
+function submitRoomName() {
+  const name = document.getElementById('roomNameInput').value.trim();
+  if (!name) {
+      return;
+  }
+  
+  const coords = pendingRoomCoords;
+  
+  if (!coords) {
+    alert('Error: Room coordinates not set. Please try clicking on the image again.');
+    return;
+  }
+  
+  pendingRoomCoords = null;
+  document.getElementById('roomNameModal').classList.remove('active');
+  
+  addRoom(name, coords.x, coords.y);
+}
+
+// Allow Enter key to submit
+document.getElementById('roomNameInput').addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') {
+      submitRoomName();
+  }
+});
+
+// ----- QR sharing -----
+
+function closeQrModal() {
+  document.getElementById('qrModal').classList.remove('active');
+}
+
+generateQrBtn.addEventListener('click', () => {
+  if (!planId) return;
+
+  const shareUrl = `${window.location.origin}/view/${planId}`;
+  const linkInput = document.getElementById('qrLinkInput');
+  linkInput.value = shareUrl;
+
+  const wrap = document.getElementById('qrCanvasWrap');
+  wrap.innerHTML = '';
+
+  const qr = new QRCodeGen(-1, QRErrorCorrectLevelGen.M);
+  qr.addData(shareUrl);
+  qr.make();
+
+  const moduleCount = qr.getModuleCount();
+  const cellSize = 6;
+  const margin = 4 * cellSize;
+  const size = moduleCount * cellSize + margin * 2;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const c = canvas.getContext('2d');
+  c.fillStyle = '#ffffff';
+  c.fillRect(0, 0, size, size);
+  c.fillStyle = '#0e2a3d';
+
+  for (let row = 0; row < moduleCount; row++) {
+    for (let col = 0; col < moduleCount; col++) {
+      if (qr.isDark(row, col)) {
+        c.fillRect(margin + col * cellSize, margin + row * cellSize, cellSize, cellSize);
+      }
+    }
+  }
+
+  wrap.appendChild(canvas);
+  document.getElementById('qrModal').classList.add('active');
+});
+
+document.getElementById('copyLinkBtn').addEventListener('click', () => {
+  const linkInput = document.getElementById('qrLinkInput');
+  linkInput.select();
+  navigator.clipboard?.writeText(linkInput.value).catch(() => {});
+  document.execCommand && document.execCommand('copy');
+  const btn = document.getElementById('copyLinkBtn');
+  const original = btn.textContent;
+  btn.textContent = 'Copied!';
+  setTimeout(() => { btn.textContent = original; }, 1200);
+});
+
+// ----- Plan upload & canvas -----
+
+async function handleFileSelect(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  dropLabel.textContent = 'Uploading...';
+
+  const formData = new FormData();
+  formData.append('plan', file);
+
+  const res = await fetch('/upload', { method: 'POST', body: formData });
+  const data = await res.json();
+
+  if (data.error) {
+    dropLabel.textContent = 'Upload failed: ' + data.error;
+    return;
+  }
+
+  planId = data.plan_id;
+  dropLabel.textContent = 'Plan loaded — ' + file.name;
+  generateQrBtn.disabled = false;
+  
+  loadCanvas(data.image_url);
+}
+
+function loadCanvas(imageUrl) {
+  placeholder.style.display = 'none';
+  canvasWrap.innerHTML = '';
+
+  img = document.createElement('img');
+  img.id = 'planImg';
+  img.src = imageUrl;
+  
+
+  img.onload = () => {
+    canvasWrap.appendChild(img);
+
+    setTimeout(() => {
+      const displayWidth = img.clientWidth || img.naturalWidth;
+      const displayHeight = img.clientHeight || img.naturalHeight;
+      
+      overlay = document.createElement('canvas');
+      overlay.id = 'overlay';
+      overlay.width = img.naturalWidth;
+      overlay.height = img.naturalHeight;
+      overlay.style.width = displayWidth + 'px';
+      overlay.style.height = displayHeight + 'px';
+      overlay.style.position = 'absolute';
+      overlay.style.top = '0';
+      overlay.style.left = '0';
+      overlay.style.cursor = 'crosshair';
+      overlay.style.zIndex = '10';
+      
+      canvasWrap.appendChild(overlay);
+    
+      ctx = overlay.getContext('2d');
+      
+      overlay.addEventListener('click', (e) => {
+          handleCanvasClick(e);
+      });
+    
+      modeBar.style.display = 'flex';
+      canvasHint.style.display = 'block';
+      roomsPanel.style.display = 'block';
+    }, 50);
+  };
+}
+
+modeRoomBtn.addEventListener('click', () => setMode('room'));
+modeEdgeBtn.addEventListener('click', () => setMode('edge'));
+
+function setMode(m) {
+  mode = m;
+  edgeFirstNode = null;
+  modeRoomBtn.classList.toggle('active', m === 'room');
+  modeEdgeBtn.classList.toggle('active', m === 'edge');
+  redraw();
+}
+
+function handleCanvasClick(e) {
+  const rect = overlay.getBoundingClientRect();
+  const scaleX = overlay.width / rect.width;
+  const scaleY = overlay.height / rect.height;
+  const x = (e.clientX - rect.left) * scaleX;
+  const y = (e.clientY - rect.top) * scaleY;
+
+  if (isNaN(x) || isNaN(y)) {
+    alert('Error: Could not determine click position. Please try again.');
+    return;
+  }
+
+  if (mode === 'room') {
+    showRoomNameModal(x, y);
+  } else {
+    const clickedNode = findNearestNode(x, y, 20);
+    if (!clickedNode) {
+      return;
+    }
+
+    if (!edgeFirstNode) {
+      edgeFirstNode = clickedNode;
+    } else if (edgeFirstNode !== clickedNode) {
+      addEdge(edgeFirstNode, clickedNode);
+      edgeFirstNode = null;
+    }
+    redraw();
+  }
+}
+
+function findNearestNode(x, y, threshold) {
+  for (const id in nodes) {
+    const n = nodes[id];
+    const d = Math.hypot(n.x - x, n.y - y);
+    if (d <= threshold) return id;
+  }
+  return null;
+}
+
+async function addRoom(name, x, y) {
+  const res = await fetch(`/plan/${planId}/node`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({name, x, y})
+  });
+  
+  const data = await res.json();
+  
+  if (data.error) { 
+    alert(data.error); 
+    return; 
+  }
+
+  nodes[data.id] = data;
+  
+  redraw();
+  refreshRoomList();
+  refreshSelects();
+}
+
+async function addEdge(srcId, dstId) {
+  const res = await fetch(`/plan/${planId}/edge`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({source: srcId, target: dstId})
+  });
+  const data = await res.json();
+  if (data.error) { alert(data.error); return; }
+
+  edges.push(data);
+  redraw();
+  refreshEdgeList();
+}
+
+async function deleteEdge(srcId, dstId, edgeIdx) {
+  const res = await fetch(`/plan/${planId}/edge`, {
+    method: 'DELETE',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({source: srcId, target: dstId})
+  });
+  const data = await res.json();
+  if (data.error) { alert(data.error); return; }
+
+  edges.splice(edgeIdx, 1);
+  redraw();
+  refreshEdgeList();
+}
+
+async function deleteRoom(id) {
+  await fetch(`/plan/${planId}/node/${id}`, {method: 'DELETE'});
+  delete nodes[id];
+  edges = edges.filter(e => e.source !== id && e.target !== id);
+  redraw();
+  refreshRoomList();
+  refreshEdgeList();
+  refreshSelects();
+}
+
+function redraw() {
+  ctx.clearRect(0, 0, overlay.width, overlay.height);
+
+  // edges
+  ctx.strokeStyle = '#4f8ca6';
+  ctx.lineWidth = 3;
+  edges.forEach(e => {
+    const a = nodes[e.source], b = nodes[e.target];
+    if (!a || !b) return;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+  });
+
+  // nodes
+  Object.values(nodes).forEach(n => {
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, 9, 0, Math.PI * 2);
+    ctx.fillStyle = (n.id === edgeFirstNode) ? '#ff6b35' : '#0e2a3d';
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.fillStyle = '#0e2a3d';
+    ctx.font = 'bold 14px monospace';
+    ctx.fillText(n.name, n.x + 14, n.y + 5);
+  });
+}
+
+function refreshRoomList() {
+  roomList.innerHTML = '';
+  Object.values(nodes).forEach(n => {
+    const li = document.createElement('li');
+    li.innerHTML = `<span>${n.name}</span>`;
+    const btn = document.createElement('button');
+    btn.textContent = 'Remove';
+    btn.onclick = () => deleteRoom(n.id);
+    li.appendChild(btn);
+    roomList.appendChild(li);
+  });
+}
+
+function refreshEdgeList() {
+  edgeListEl.innerHTML = '';
+  if (edges.length === 0) {
+    const li = document.createElement('li');
+    li.textContent = 'No connections yet.';
+    li.style.opacity = '0.7';
+    edgeListEl.appendChild(li);
+    return;
+  }
+  edges.forEach((e, idx) => {
+    const li = document.createElement('li');
+    li.innerHTML = `<span>${nodes[e.source]?.name} ↔ ${nodes[e.target]?.name}</span>`;
+    const btn = document.createElement('button');
+    btn.textContent = 'Remove';
+    btn.onclick = () => deleteEdge(e.source, e.target, idx);
+    li.appendChild(btn);
+    edgeListEl.appendChild(li);
+  });
+}
+
+function refreshSelects() {
+  const opts = Object.values(nodes).map(n => `<option value="${n.id}">${n.name}</option>`).join('');
+  if (Object.keys(nodes).length === 0) {
+    sourceSelect.innerHTML = '<option>No rooms yet</option>';
+    destSelect.innerHTML = '<option>No rooms yet</option>';
+    sourceSelect.disabled = true;
+    destSelect.disabled = true;
+    findRouteBtn.disabled = true;
+  } else {
+    sourceSelect.innerHTML = opts;
+    destSelect.innerHTML = opts;
+    sourceSelect.disabled = false;
+    destSelect.disabled = false;
+    findRouteBtn.disabled = false;
+  }
+}
+
+findRouteBtn.addEventListener('click', async () => {
+  const source = sourceSelect.value;
+  const target = destSelect.value;
+
+  if (source === target) {
+    routeResult.innerHTML = '<div class="error-msg">Source and destination are the same room.</div>';
+    return;
+  }
+
+  routeResult.innerHTML = '<p class="hint">Calculating route...</p>';
+
+  const res = await fetch(`/plan/${planId}/path?source=${source}&target=${target}`);
+  const data = await res.json();
+
+  if (data.error) {
+    routeResult.innerHTML = `<div class="error-msg">${data.error}</div>`;
+    return;
+  }
+
+  renderRoute(data);
+});
+
+function iconForInstruction(instr) {
+  if (instr.includes('right')) return '↱';
+  if (instr.includes('left')) return '↰';
+  if (instr.includes('around')) return '↶';
+  if (instr.includes('straight') || instr.includes('Face')) return '↑';
+  return '•';
+}
+
+function renderRoute(data) {
+  let html = `<div class="route-card">
+    <div class="route-summary">
+      Route: ${data.path_names.join(' → ')}<br>
+      Total distance: <span class="dist">${data.total_distance}</span> units
+    </div>`;
+
+  data.directions.forEach((step, i) => {
+    html += `<div class="step">
+      <div class="step-icon">${iconForInstruction(step.instruction)}</div>
+      <div class="step-text">
+        <div class="from-to">${step.instruction} — toward <strong>${step.to}</strong></div>
+        <div class="meta">from ${step.from} · ${step.distance} units · facing ${step.direction_facing}</div>
+      </div>
+    </div>`;
+  });
+
+  html += `<div class="step">
+    <div class="step-icon">●</div>
+    <div class="step-text"><div class="from-to">You have arrived at <strong>${data.path_names[data.path_names.length-1]}</strong></div></div>
+  </div></div>`;
+
+  routeResult.innerHTML = html;
+}
+</script>
+</body>
+</html>
