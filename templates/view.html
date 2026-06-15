@@ -315,7 +315,7 @@ findRouteBtn.addEventListener('click', async () => {
     routeResult.innerHTML = `<div class="error-msg">${data.error}</div>`;
     return;
   }
-
+  renderRoute(data);
 });
 
 function iconForInstruction(instr) {
@@ -325,6 +325,32 @@ function iconForInstruction(instr) {
   if (instr.includes('straight') || instr.includes('Face')) return '↑';
   return '•';
 }
+
+function renderRoute(data) {
+  let html = `<div class="route-card">
+    <div class="route-summary">
+      Route: ${data.path_names.join(' → ')}<br>
+      Total distance: <span class="dist">${data.total_distance}</span> units
+    </div>`;
+
+  data.directions.forEach((step, i) => {
+    html += `<div class="step">
+      <div class="step-icon">${iconForInstruction(step.instruction)}</div>
+      <div class="step-text">
+        <div class="from-to">${step.instruction} — toward <strong>${step.to}</strong></div>
+        <div class="meta">from ${step.from} · ${step.distance} units · facing ${step.direction_facing}</div>
+      </div>
+    </div>`;
+  });
+
+  html += `<div class="step">
+    <div class="step-icon">●</div>
+    <div class="step-text"><div class="from-to">You have arrived at <strong>${data.path_names[data.path_names.length-1]}</strong></div></div>
+  </div></div>`;
+
+  routeResult.innerHTML = html;
+}
+
 
 init();
 </script>
