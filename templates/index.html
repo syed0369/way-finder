@@ -671,10 +671,8 @@ function setMode(m) {
 
 function handleCanvasClick(e) {
   const rect = overlay.getBoundingClientRect();
-  const scaleX = overlay.width / rect.width;
-  const scaleY = overlay.height / rect.height;
-  const x = (e.clientX - rect.left) * scaleX;
-  const y = (e.clientY - rect.top) * scaleY;
+  const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
 
   if (isNaN(x) || isNaN(y)) {
     alert('Error: Could not determine click position. Please try again.');
@@ -700,9 +698,13 @@ function handleCanvasClick(e) {
 }
 
 function findNearestNode(x, y, threshold) {
+  const px = x * overlay.width;
+  const py = y * overlay.height;
   for (const id in nodes) {
     const n = nodes[id];
-    const d = Math.hypot(n.x - x, n.y - y);
+    const dx = (n.x * overlay.width) - px;
+    const dy = (n.y * overlay.height) - py;
+    const d = Math.hypot(dx, dy);
     if (d <= threshold) return id;
   }
   return null;
@@ -777,15 +779,17 @@ function redraw() {
     const a = nodes[e.source], b = nodes[e.target];
     if (!a || !b) return;
     ctx.beginPath();
-    ctx.moveTo(a.x, a.y);
-    ctx.lineTo(b.x, b.y);
+    ctx.moveTo(a.x * overlay.width, a.y * overlay.height);
+    ctx.lineTo(b.x * overlay.width, b.y * overlay.height);
     ctx.stroke();
   });
 
   // nodes
   Object.values(nodes).forEach(n => {
+    const px = n.x * overlay.width;
+    const py = n.y * overlay.height;
     ctx.beginPath();
-    ctx.arc(n.x, n.y, 9, 0, Math.PI * 2);
+    ctx.arc(px, py, 9, 0, Math.PI * 2);
     ctx.fillStyle = (n.id === edgeFirstNode) ? '#ff6b35' : '#0e2a3d';
     ctx.fill();
     ctx.strokeStyle = '#fff';
@@ -794,7 +798,7 @@ function redraw() {
 
     ctx.fillStyle = '#0e2a3d';
     ctx.font = 'bold 14px monospace';
-    ctx.fillText(n.name, n.x + 14, n.y + 5);
+    ctx.fillText(n.name, px + 14, py + 5);
   });
 }
 
