@@ -167,10 +167,21 @@ def turn_instruction(prev_bearing, curr_bearing):
     elif 15 < diff <= 135:
         return "Turn right"
     elif 135 < diff < 225:
-        return "Turn around (U-turn)"
+        return "Turn around (back)"
     elif 225 <= diff < 345:
         return "Turn left"
     return "Go straight"
+
+
+def first_step_instruction(seg_bearing):
+    """Convert the first segment's bearing into a simple starting instruction."""
+    if seg_bearing <= 15 or seg_bearing >= 345:
+        return "Go straight"
+    if 15 < seg_bearing < 165:
+        return "Turn right"
+    if 165 <= seg_bearing <= 195:
+        return "Turn around (back)"
+    return "Turn left"
 
 
 def generate_directions(G, path):
@@ -187,7 +198,7 @@ def generate_directions(G, path):
         dist = round(G[n1][n2]["weight"], 1)
 
         if i == 0:
-            instruction = f"Face {bearing_to_compass(seg_bearing)} and go straight"
+            instruction = first_step_instruction(seg_bearing)
         else:
             turn = turn_instruction(current_heading, seg_bearing)
             instruction = turn
