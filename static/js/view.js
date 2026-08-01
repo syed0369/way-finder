@@ -72,13 +72,20 @@ async function init() {
 function setupCanvas() {
   if (!planImg || !planImg.naturalWidth) return;
 
-  overlay.width = planImg.naturalWidth;
-  overlay.height = planImg.naturalHeight;
-  overlay.style.width = '100%';
-  overlay.style.height = '100%';
+  const rect = planImg.getBoundingClientRect();
+  const width = Math.max(1, rect.width || planImg.clientWidth || planImg.naturalWidth);
+  const height = Math.max(1, rect.height || planImg.clientHeight || planImg.naturalHeight);
+  const dpr = window.devicePixelRatio || 1;
+
+  overlay.width = Math.round(width * dpr);
+  overlay.height = Math.round(height * dpr);
+  overlay.style.width = `${width}px`;
+  overlay.style.height = `${height}px`;
   overlay.style.left = '0';
   overlay.style.top = '0';
+
   ctx = overlay.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   drawOverlay();
 }
 
@@ -90,14 +97,24 @@ function getNodePosition(nodeId) {
   return { x: Number(node.x), y: Number(node.y) };
 }
 
+function getDisplaySize() {
+  const rect = planImg.getBoundingClientRect();
+  return {
+    width: Math.max(1, rect.width || planImg.clientWidth || planImg.naturalWidth),
+    height: Math.max(1, rect.height || planImg.clientHeight || planImg.naturalHeight)
+  };
+}
+
 function toDisplayPoint(pos) {
-  return { x: pos.x * overlay.width, y: pos.y * overlay.height };
+  const display = getDisplaySize();
+  return { x: pos.x * display.width, y: pos.y * display.height };
 }
 
 function drawOverlay() {
   if (!ctx || !overlay.width) return;
 
-  ctx.clearRect(0, 0, overlay.width, overlay.height);
+  const display = getDisplaySize();
+  ctx.clearRect(0, 0, display.width, display.height);
 
   if (!routeData || !routeData.path || routeData.path.length < 2) {
     return;
